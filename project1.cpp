@@ -4,7 +4,7 @@
 #include <chrono>
 #include <mpi.h>
 
-// Adaptive Median filter
+// Adaptive median filter
 uchar adaptiveMedianFilter(cv::Mat& img, int row, int col, int kernelSize, int maxSize)
 {
     std::vector<uchar> pixels;
@@ -22,6 +22,7 @@ uchar adaptiveMedianFilter(cv::Mat& img, int row, int col, int kernelSize, int m
     auto max = pixels[kernelSize * kernelSize - 1]; // max
     auto med = pixels[kernelSize * kernelSize / 2]; // median
     auto zxy = img.at<uchar>(row, col); // Current pixel value
+
     if (med > min && med < max)
     {
         // If the median is not noise, determine the return center point value or median based on the current pixel
@@ -46,7 +47,7 @@ void adaptiveMeanFilter(const cv::Mat& src, cv::Mat& dst, int minSize = 3, int m
     cv::copyMakeBorder(src, dst, maxSize / 2, maxSize / 2, maxSize / 2, maxSize / 2, cv::BORDER_REFLECT); // Fill the input image with boundaries
     int rows = dst.rows;
     int cols = dst.cols;
-#pragma omp parallel for
+
     for (int j = maxSize / 2; j < rows - maxSize / 2; ++j)
     {
         for (int i = maxSize / 2; i < cols * dst.channels() - maxSize / 2; ++i)
@@ -105,7 +106,11 @@ int main(int argc, char** argv)
         (endRow - startRow) * cols * 3, MPI_BYTE, 0, MPI_COMM_WORLD);
 
     // Start measuring time
-    double start = MPI_Wtime();
+    double start = 0.0, end = 0.0;
+    if (rank == 0)
+    {
+        start = MPI_Wtime();
+    }
 
     // Apply adaptive mean filter to local image subset
     adaptiveMeanFilter(localSrc, localDst);
@@ -115,13 +120,13 @@ int main(int argc, char** argv)
         (endRow - startRow) * cols * 3, MPI_BYTE, 0, MPI_COMM_WORLD);
 
     // Stop measuring time
-    double end = MPI_Wtime();
-
     if (rank == 0)
     {
+        end = MPI_Wtime();
+
         // Calculate the elapsed time
         double elapsedSeconds = end - start;
-        std::cout << "Elapsed time: " << elapsedSeconds << " seconds" << std::endl;
+        std::cout << "Elapsed time (parallel part only): " << elapsedSeconds << " seconds" << std::endl;
 
         cv::imshow("src", src); // Show original image
         cv::waitKey(0);
